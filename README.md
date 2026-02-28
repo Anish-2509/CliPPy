@@ -1,51 +1,55 @@
-# Snippy
+# CliPPy - Personal Offline Knowledge Base
 
-A fast, offline command-line knowledge base for saving and reusing code snippets, commands, and notes. Snippy stores everything locally in SQLite and gives you instant search and clipboard copy so you can paste the answer and keep moving.
+A TUI command-line tool built in Go that acts as a personal knowledge base for code snippets, commands, and notes. Users can save snippets with titles and tags, then retrieve them instantly without needing to search online.
 
-## Why Snippy
+## Why CliPPy
 
-You have commands you look up over and over: `docker prune`, SQL joins, curl flags, git incantations. Snippy lets you save them once and retrieve them in seconds without opening a browser.
-
-## Features (MVP)
-
-- Save snippets with title, language, and tags
-- List all snippets in a readable table
-- Search by title or tag (case-insensitive)
-- Copy a snippet to the clipboard by ID
-
-## Planned Enhancements
-
-- Fuzzy search for typos and partial matches
-- Open snippet in `$EDITOR`
-- Import/export snippets (JSON)
-- Sync directory (opt-in) for teams
-
-## Tech Stack
-
-- Language: Go
-- CLI framework: Cobra (recommended)
-- Storage: SQLite
-- Clipboard: platform-aware clipboard library
+You have commands you look up over and over: `docker prune`, SQL joins, curl flags, git incantations. CliPPy lets you save them once and retrieve them in seconds without opening a browser.
 
 ## Architecture
 
-Snippy is organized into three layers for clarity and testability:
+The project follows a clean, layered architecture:
 
-1. CLI layer
-   - Parses commands and flags
-   - Formats output and errors
+```
+┌─────────────────┐
+│   CLI Layer     │  (Cobra commands: save, list, search, copy, edit, delete)
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│ Business Logic  │  (Validation, tagging, search algorithms)
+└────────┬────────┘
+         │
+┌────────▼────────┐
+│   Data Layer    │  (SQLite database operations)
+└─────────────────┘
+```
 
-2. Business logic layer
-   - Validates inputs
-   - Applies tagging and search rules
-   - Coordinates clipboard copy and editor integration
+## Project Structure
 
-3. Data layer
-   - Manages SQLite connection
-   - Handles schema migrations
-   - Runs queries
+```
+clippy/
+├── cmd/
+│   └── clippy/
+│       └── main.go              # Entry point
+├── internal/
+│   ├── cli/
+│   │   └── commands.go          # Cobra command definitions
+│   ├── database/
+│   │   ├── db.go                # Database connection & initialization
+│   │   └── schema.go             # SQLite schema & migrations
+│   ├── models/
+│   │   └── snippet.go            # Snippet data model
+│   └── services/
+│       ├── snippet_service.go   # Business logic for snippets
+│       └── clipboard.go         # Clipboard operations
+├── go.mod
+├── go.sum
+└── README.md
+```
 
 ## Database Schema
+
+SQLite table structure:
 
 ```sql
 CREATE TABLE snippets (
@@ -54,65 +58,96 @@ CREATE TABLE snippets (
     code TEXT NOT NULL,
     language TEXT,
     tags TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE INDEX IF NOT EXISTS idx_title ON snippets(title);
+CREATE INDEX IF NOT EXISTS idx_tags ON snippets(tags);
 ```
 
-## CLI Design
+## Core Features
 
-Examples of how the CLI will look:
+### 1. Save Command
 
-- Save with an editor:
-  - `snippy save --title "Docker Prune" --lang "bash" --tags "docker,cleanup"`
-- Save directly with code:
-  - `snippy save --title "JSON Parse" --lang "go" --tags "json" --code "fmt.Println(\"hi\")"`
-- List all snippets:
-  - `snippy list`
-- Search snippets:
-  - `snippy search "docker"`
-- Copy snippet by ID:
-  - `snippy copy 5`
+- `clippy save --title "Docker Prune" --lang bash --tags "docker,cleanup"`
+- If `--code` flag not provided, open temporary file in user's editor
+- Support reading from stdin: `echo "code" | clippy save --title "..."`
+- Save directly with code: `clippy save --title "JSON Parse" --lang "go" --tags "json" --code "fmt.Println(\"hi\")"`
+
+### 2. List Command
+
+- `clippy list` - Show all snippets in a formatted table
+- `clippy list --tags "docker"` - Filter by tags
+- Display: ID, Title, Language, Tags, Created Date
+
+### 3. Search Command
+
+- `clippy search "docker"` - Search in titles and tags
+- `clippy search "prune" --lang bash` - Filter by language
+- Optional: Fuzzy search using `sahilm/fuzzy` library
+
+### 4. Copy Command
+
+- `clippy copy 5` - Copy snippet #5 to clipboard
+- `clippy copy --title "Docker Prune"` - Copy by title match
+
+### 5. Edit Command
+
+- `clippy edit 5` - Open snippet #5 in editor for modification
+- Update `updated_at` timestamp
+
+### 6. Delete Command
+
+- `clippy delete 5` - Remove snippet by ID
+- `clippy delete --title "..."` - Remove by title match
+- Confirm before deletion
+
+## Technical Stack
+
+- **CLI Framework:** [spf13/cobra](https://github.com/spf13/cobra)
+- **Database:** [mattn/go-sqlite3](https://github.com/mattn/go-sqlite3)
+- **Clipboard:** [atotto/clipboard](https://github.com/atotto/clipboard) or [golang.design/x/clipboard](https://golang.design/x/clipboard)
+- **Table Formatting:** [olekukonko/tablewriter](https://github.com/olekukonko/tablewriter)
+- **Fuzzy Search (optional):** [sahilm/fuzzy](https://github.com/sahilm/fuzzy)
+- **Editor Detection:** Use `$EDITOR` environment variable, fallback to `vim`/`nano`
+
+## Implementation Details
+
+### Data Storage
+
+- Database file location: `~/.clippy/clippy.db` (or `%APPDATA%\clippy\clippy.db` on Windows)
+- Create directory if it doesn't exist
+- Initialize schema on first run
+
+### Editor Integration
+
+- Detect `$EDITOR` environment variable
+- Fallback to platform-specific defaults (vim on Unix, notepad on Windows)
+- Create temporary file, spawn editor process, read content after editor closes
+
+### Tag Parsing
+
+- Parse comma-separated tags: `"docker,cleanup,devops"`
+- Normalize tags (lowercase, trim whitespace)
+- Support tag filtering in list/search commands
+
+### Clipboard Operations
+
+- Cross-platform clipboard support
+- Handle errors gracefully (e.g., if clipboard not available)
 
 ## Save Command Flow
 
-1. User runs `snippy save --title "JSON Parse" --lang go`
+1. User runs `clippy save --title "JSON Parse" --lang go`
 2. If `--code` is not provided, open `$EDITOR` with a temp file
 3. Read the file contents after the editor closes
 4. Insert into SQLite
 5. Print success and the new ID
 
-## Clipboard Behavior
-
-- `snippy copy <id>` loads the snippet content and copies it to the system clipboard
-- Should work on macOS, Windows, and Linux
-
-## Go Implementation Plan
-
-1. Initialize module
-   - `go mod init snippy`
-2. Set up CLI
-   - `cobra init` and add subcommands: `save`, `list`, `search`, `copy`
-3. Add SQLite layer
-   - create connection
-   - ensure schema exists
-   - implement CRUD
-4. Implement business logic
-   - validation and tag normalization
-   - search rules
-5. Add clipboard support
-   - use a cross-platform clipboard package
-6. Add tests
-   - unit tests for search and storage
-
-## Fuzzy Search (Optional)
-
-Use a fuzzy matcher so `dckr prun` still finds `Docker Prune`.
-
-- Go library: `sahilm/fuzzy`
-
 ## Development Notes
 
-- Keep data in a user-specific config dir (for example `~/.local/share/snippy/snippy.db` or `%AppData%\snippy\snippy.db`)
+- Keep data in a user-specific config dir (`~/.clippy/clippy.db` or `%APPDATA%\clippy\clippy.db`)
 - Provide a `--db` flag for custom locations
 - Keep output stable and scriptable (no color by default)
 
