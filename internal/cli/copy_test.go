@@ -49,6 +49,7 @@ func TestRunCopy_ArgValidationMatrix(t *testing.T) {
 		name        string
 		args        []string
 		title       string
+		id          int64
 		wantErr     bool
 		errContains string
 	}{
@@ -56,27 +57,85 @@ func TestRunCopy_ArgValidationMatrix(t *testing.T) {
 			name:        "no args and no title",
 			args:        []string{},
 			title:       "",
+			id:          0,
 			wantErr:     true,
-			errContains: "either [id] or --title is required",
+			errContains: "either [id], --id, or --title is required",
 		},
 		{
 			name:        "both id and title provided",
 			args:        []string{"1"},
 			title:       "Some Title",
+			id:          0,
 			wantErr:     true,
-			errContains: "cannot use both [id] and --title together",
+			errContains: "cannot use ID and --title together",
 		},
 		{
-			name:        "valid id only",
+			name:    "valid id only",
+			args:    []string{"1"},
+			title:   "",
+			id:      0,
+			wantErr: false,
+		},
+		{
+			name:    "valid title only",
+			args:    []string{},
+			title:   "Docker Prune",
+			id:      0,
+			wantErr: false,
+		},
+		{
+			name:    "valid --id flag only",
+			args:    []string{},
+			title:   "",
+			id:      1,
+			wantErr: false,
+		},
+		{
+			name:        "both positional id and --id flag",
 			args:        []string{"1"},
 			title:       "",
-			wantErr:     false,
+			id:          2,
+			wantErr:     true,
+			errContains: "cannot use both [id] and --id together",
 		},
 		{
-			name:        "valid title only",
+			name:        "negative --id flag",
+			args:        []string{},
+			title:       "",
+			id:          -2,
+			wantErr:     true,
+			errContains: "must be a positive integer",
+		},
+		{
+			name:        "whitespace title only",
+			args:        []string{},
+			title:       "   ",
+			id:          0,
+			wantErr:     true,
+			errContains: "either [id], --id, or --title is required",
+		},
+		{
+			name:        "--id and --title provided",
 			args:        []string{},
 			title:       "Docker Prune",
-			wantErr:     false,
+			id:          1,
+			wantErr:     true,
+			errContains: "cannot use ID and --title together",
+		},
+		{
+			name:        "zero --id treated as not provided",
+			args:        []string{},
+			title:       "",
+			id:          0,
+			wantErr:     true,
+			errContains: "either [id], --id, or --title is required",
+		},
+		{
+			name:    "positional id and blank title should pass",
+			args:    []string{"1"},
+			title:   "   ",
+			id:      0,
+			wantErr: false,
 		},
 	}
 
@@ -96,7 +155,7 @@ func TestRunCopy_ArgValidationMatrix(t *testing.T) {
 				Clipboard: mockClipboard,
 			}
 
-			err := runCopy(opts, tt.args, tt.title, 0)
+			err := runCopy(opts, tt.args, tt.title, tt.id)
 
 			if tt.wantErr {
 				if err == nil {

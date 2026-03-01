@@ -410,15 +410,22 @@ Examples:
 
 // runCopy executes the copy command logic
 func runCopy(opts *CLIOptions, args []string, title string, id int64) error {
-	// Validate: either positional ID or --title flag, but not both
-	hasID := len(args) > 0
+	title = strings.TrimSpace(title)
+	hasPositionalID := len(args) > 0
+	hasIDFlag := id != 0
 	hasTitle := title != ""
 
-	if hasID && hasTitle {
-		return errors.New("cannot use both [id] and --title together")
+	if id < 0 {
+		return fmt.Errorf("invalid ID '%d': must be a positive integer", id)
 	}
-	if !hasID && !hasTitle {
-		return errors.New("either [id] or --title is required")
+	if hasPositionalID && hasIDFlag {
+		return errors.New("cannot use both [id] and --id together")
+	}
+	if (hasPositionalID || hasIDFlag) && hasTitle {
+		return errors.New("cannot use ID and --title together")
+	}
+	if !hasPositionalID && !hasIDFlag && !hasTitle {
+		return errors.New("either [id], --id, or --title is required")
 	}
 
 	if err := initDB(opts); err != nil {
@@ -431,12 +438,13 @@ func runCopy(opts *CLIOptions, args []string, title string, id int64) error {
 	var err error
 
 	// Resolve snippet by ID or title
-	if hasID {
-		// Parse ID from positional argument
-		id, err := parseID(args[0])
-		if err != nil {
-			return err
+	if hasPositionalID {
+		parsedID, parseErr := parseID(args[0])
+		if parseErr != nil {
+			return parseErr
 		}
+		snippet, err = snippetService.GetById(parsedID)
+	} else if hasIDFlag {
 		snippet, err = snippetService.GetById(id)
 	} else {
 		snippet, err = snippetService.GetByTitle(title)
