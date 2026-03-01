@@ -1,8 +1,18 @@
 package main
+
 import (
-	"fmt"
+	"clippy/internal/cli"
+	"os"
 )
 
 func main() {
-	fmt.Println("CliPPy - A CLI tool for clipboard management")
+	// CLI options; DB initialization happens lazily in commands that need persistence.
+	opts := &cli.CLIOptions{
+		Stdin:  os.Stdin,
+		Stdout: os.Stdout,
+		Stderr: os.Stderr,
+	}
+
+	// Execute the CLI
+	cli.Execute(opts)
 }
