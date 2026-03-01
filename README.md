@@ -92,6 +92,15 @@ CREATE INDEX IF NOT EXISTS idx_tags ON snippets(tags);
 - `clippy copy 5` - Copy snippet #5 to clipboard
 - `clippy copy --title "Docker Prune"` - Copy by title match
 
+### Notes and Plain Text Support
+
+- CliPPy already supports notes and any plain text, not only code.
+- Internally, `code` stores arbitrary text content.
+- This means `save`, `search`, `list`, and `copy` work for notes as well.
+- Example:
+  - `clippy save --title "Oncall Notes" --tags "notes,ops" --code "Restart order: API -> Worker -> Scheduler"`
+  - `clippy copy --title "Oncall Notes"`
+
 ### 5. Edit Command
 
 - `clippy edit 5` - Open snippet #5 in editor for modification
@@ -150,6 +159,44 @@ CREATE INDEX IF NOT EXISTS idx_tags ON snippets(tags);
 - Keep data in a user-specific config dir (`~/.clippy/clippy.db` or `%APPDATA%\clippy\clippy.db`)
 - Provide a `--db` flag for custom locations
 - Keep output stable and scriptable (no color by default)
+
+## Product Ideas
+
+### Practical Feature Upgrades
+
+- Favorites / pinning:
+  - Mark important snippets with `--favorite`, list with `clippy list --favorite`.
+- Recent activity:
+  - `clippy recent` to show recently copied/edited snippets.
+- Import and export:
+  - JSON/Markdown export and import for backup and sync.
+- Duplicate detection:
+  - Warn when saving nearly identical content/title.
+- Rich metadata:
+  - Add optional `description` and `source` fields.
+- Safer deletion:
+  - Soft delete + restore command before permanent purge.
+
+### Realtime TUI Vibe (Lightweight, Legitimate)
+
+- Interactive search mode:
+  - `clippy search --interactive` with live filtering as user types.
+- Live command palette:
+  - A `:` style quick launcher for `save/list/search/copy/edit/delete`.
+- Inline preview panel:
+  - While navigating results, show full snippet/notes preview in side pane.
+- Keyboard-first flow:
+  - `j/k` navigation, `enter` copy, `/` filter, `e` edit, `d` delete.
+- Live status hints:
+  - Real-time footer showing selected item, tags, language, and shortcuts.
+- Debounced search:
+  - Update results after short typing delay for smooth UX.
+
+### Suggested TUI Stack
+
+- Bubble Tea (`charmbracelet/bubbletea`) for event loop
+- Bubbles (`charmbracelet/bubbles`) for list/input/table components
+- Lip Gloss (`charmbracelet/lipgloss`) for styling
 
 ## License
 
